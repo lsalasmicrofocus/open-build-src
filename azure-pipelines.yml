@@ -1,0 +1,30 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+pool:
+  name: Azure Pipelines
+steps:
+- task: JavaToolInstaller@0
+  displayName: 'Use Java 17'
+  inputs:
+    versionSpec: 17
+    jdkArchitectureOption: x64
+    jdkSourceOption: PreInstalled
+
+
+- task: fortifyvsts.hpe-security-fortify-vsts.build-task-fortify-scancentral-sast.FortifyScanCentralSAST@7
+  displayName: 'Fortify ScanCentral SAST Assessment'
+  inputs:
+    scanCentralCtrlUrl: 'https://scsastctrl.stage.cyberresstage.com/scancentral-ctrl'
+    ScanCentral.ClientToken: $(ScanCentral.ClientToken)
+    ScanCentral.SscCiToken: $(ScanCentral.SscCiToken)
+    sscUrl: 'https://ssc.stage.cyberresstage.com/'
+    uploadToSSC: true
+    applicationName: 'TestLuis_AzureDevOps_Kotlin'
+    applicationVersion: v02
+    buildTool: gradle
+    skipBuild: false
+    includeTest: false
+    quiet: false
