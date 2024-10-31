@@ -1,0 +1,24 @@
+pool:
+  name: Azure Pipelines
+#Your build pipeline references an undefined variable named ‘Pipeline.Workspace’. Create or edit the build pipeline for this YAML file, define the variable on the Variables tab. See https://go.microsoft.com/fwlink/?linkid=865972
+
+steps:
+- task: JavaToolInstaller@0
+  displayName: 'Use Java 17'
+  inputs:
+    versionSpec: 17
+    jdkArchitectureOption: x64
+    jdkSourceOption: PreInstalled
+
+- task: fortifyvsts.hpe-security-fortify-vsts.build-task-fortify-on-demand-static.FortifyOnDemandStatic@9
+  displayName: 'Run Fortify on Demand static assessment on $(Pipeline.Workspace)/s'
+  inputs:
+    FortifyProjects: '$(Pipeline.Workspace)/s'
+    FodConnection: 'tam_team_test'
+    ReleaseOptions: 0
+    ReleaseId: 664800
+    EntitlementSelection: 1
+    OverrideScanSettings: 2
+    InProgressScanActionType: 2
+    RemediationScanPreference: 0
+    PolicyFailAction: 1
