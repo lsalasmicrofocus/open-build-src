@@ -9,19 +9,18 @@ pipeline {
         stage('Debricked Scan') {
             steps {
                 script {
-                    // Hardcode since Jenkins is running on Windows
                     def osName = "windows"
-                    def osArch = "x86_64" // adjust if needed
+                    def osArch = "x86_64"
 
                     println("OS detected: " + osName + " and architecture " + osArch)
 
-                    // Download Debricked CLI using curl (bundled with Git for Windows)
+                    // Download Debricked CLI ZIP
                     bat """
                         curl -L -o debricked.zip https://github.com/debricked/cli/releases/download/release-v2/cli_${osName}_${osArch}.zip
-                        tar -xf debricked.zip
+                        unzip -o debricked.zip
                     """
 
-                    // Run the scan with the Windows executable
+                    // Run the scan
                     bat 'debricked.exe scan'
                 }
             }
