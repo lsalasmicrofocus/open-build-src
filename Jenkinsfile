@@ -1,19 +1,13 @@
 pipeline {
   agent any
 
-  // No 'tools { jdk ... }' and no 'ansiColor' to avoid missing-tool/plugin errors.
   options {
-    timestamps()   // built-in and available in your instance per the valid options list
+    timestamps()  // Keep logs readable; no external plugin required
   }
 
   environment {
-    // Debricked access token stored as a Jenkins "Secret text" credential
+    // Debricked access token must exist as a "Secret text" credential in Jenkins
     DEBRICKED_TOKEN = credentials('DEBRICKED_TOKEN')
-
-    // OPTIONAL: Point this to a Java 17 path on your agent to avoid Gradle 7.x vs Java 21 issues.
-    // Example Windows:  C:\Program Files\Eclipse Adoptium\jdk-17
-    // Example Linux:    /usr/lib/jvm/temurin-17
-    JAVA17_HOME = ''   // <— leave empty if you don't have it; or set at the job level
   }
 
   stages {
@@ -23,44 +17,40 @@ pipeline {
       }
     }
 
-    stage('Prepare Java (optional JDK 17)') {
+    stage('Upgrade Gradle Wrapper to 8.14.4 (workspace-only)') {
+      when {
+        anyOf {
+          expression { fileExists('gradlew') }
+          expression { fileExists('gradlew.bat') }
+        }
+      }
       steps {
         script {
-          // If JAVA17_HOME is provided, prepend it to PATH and export JAVA_HOME.
-          if (env.JAVA17_HOME?.trim()) {
-            if (isUnix()) {
-              withEnv(["JAVA_HOME=${env.JAVA17_HOME}", "PATH=${env.JAVA17_HOME}/bin:${env.PATH}"]) {
-                sh '''
-                  set -e
-                  echo "Using JAVA_HOME=$JAVA_HOME"
-                  java -version || true
-                '''
+          if (isUnix()) {
+            sh '''
+              set -e
+              echo "Attempting Gradle wrapper upgrade to 8.14.4 (Unix, workspace-only)..."
+              ./gradlew --no-daemon wrapper --gradle-version 8.14.4 || {
+                echo "[WARN] Gradle wrapper upgrade failed; continuing (init scripts may still fail on Java 21 with old Gradle)."
               }
-            } else {
-              withEnv(["JAVA_HOME=${env.JAVA17_HOME}", "PATH=${env.JAVA17_HOME}\\bin;${env.PATH}"]) {
-                bat '''
-                  @echo on
-                  echo Using JAVA_HOME=%JAVA_HOME%
-                  java -version
-                '''
-              }
-            }
+              echo "Wrapper version after upgrade attempt:"
+              ./gradlew --version || true
+            '''
           } else {
-            // No JAVA17_HOME provided; just show current Java
-            if (isUnix()) {
-              sh '''
-                echo "JAVA_HOME not provided; using system Java"
-                echo "PATH=$PATH"
-                java -version || true
-              '''
-            } else {
-              bat '''
-                @echo on
-                echo JAVA_HOME not provided; using system Java
-                echo PATH=%PATH%
-                java -version
-              '''
-            }
+            bat '''
+              @echo on
+              if exist gradlew.bat (
+                echo Attempting Gradle wrapper upgrade to 8.14.4 (Windows, workspace-only)...
+                call gradlew.bat --no-daemon wrapper --gradle-version 8.14.4
+                if errorlevel 1 (
+                  echo [WARN] Gradle wrapper upgrade failed; continuing (init scripts may still fail on Java 21 with old Gradle).
+                )
+                echo Wrapper version after upgrade attempt:
+                call gradlew.bat --version
+              ) else (
+                echo No Gradle wrapper found; skipping upgrade.
+              )
+            '''
           }
         }
       }
@@ -147,11 +137,10 @@ pipeline {
   post {
     always {
       script {
-        echo "NOTE:"
-        echo " - Debricked CLI Windows asset is .tar.gz, not .zip (we use tar -xzf to extract)."
-        echo " - If you still see Gradle errors like 'Unsupported class file major version 65', either:"
-        echo "     a) Set JAVA17_HOME to a JDK 17 on the agent (this pipeline will use it), or"
-        echo "     b) Upgrade your repo's Gradle wrapper to 8.5+ so it can run on Java 21."
+        echo "NOTES:"
+        echo " - Debricked CLI for Windows is shipped as .tar.gz; we extract debricked.exe with tar. (Official docs and releases confirm this format.)"
+        echo " - This pipeline upgrades the Gradle wrapper in the workspace to 8.14.4 before scanning so it can run on Java 21 and avoid 'major version 65'."
+        echo "   For a permanent fix, commit the wrapper bump in your repository."
       }
     }
   }
