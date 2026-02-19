@@ -14,14 +14,18 @@ pipeline {
 
                     println("OS detected: " + osName + " and architecture " + osArch)
 
-                    // Download Debricked CLI using certutil (built into Windows)
+                    // Download Debricked CLI tar.gz
                     bat """
-                        certutil -urlcache -split -f https://github.com/debricked/cli/releases/download/release-v2/cli_${osName}_${osArch}.zip debricked.zip
-                    """
-
-                    // Extract ZIP using built-in expand (works for CAB/ZIP)
-                    bat """
-                        expand debricked.zip -F:* .
+                        curl -L -o debricked.tar.gz https://github.com/debricked/cli/releases/latest/download/cli_${osName}_${osArch}.tar.gz
+                        
+                        REM Try Git for Windows tar first
+                        where tar >nul 2>nul && tar -xzf debricked.tar.gz || (
+                            REM If tar not found, try 7-Zip
+                            where 7z >nul 2>nul && 7z x debricked.tar.gz -y || (
+                                REM If 7z not found, fallback to PowerShell
+                                powershell -Command "tar -xzf debricked.tar.gz"
+                            )
+                        )
                     """
 
                     // Run the scan
