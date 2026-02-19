@@ -17,11 +17,11 @@ pipeline {
                     // Download Debricked CLI zip for Windows
                     powershell """
                         Invoke-WebRequest -Uri https://github.com/debricked/cli/releases/latest/download/cli_${osName}_${osArch}.zip -OutFile debricked.zip
-                        Expand-Archive debricked.zip -DestinationPath .
+                        Expand-Archive -Path debricked.zip -DestinationPath .
                     """
 
-                    // Run the scan
-                    bat 'debricked.exe scan'
+                    // Run the scan with token
+                    bat 'debricked.exe scan --access-token %DEBRICKED_TOKEN%'
                 }
             }
         }
