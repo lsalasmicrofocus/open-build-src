@@ -2,11 +2,11 @@ pipeline {
   agent any
 
   options {
-    timestamps()  // Keep logs readable; no external plugin required
+    timestamps()  // built-in; no plugin dependencies
   }
 
   environment {
-    // Debricked access token must exist as a "Secret text" credential in Jenkins
+    // Debricked access token stored as a Jenkins "Secret text" credential
     DEBRICKED_TOKEN = credentials('DEBRICKED_TOKEN')
   }
 
@@ -27,29 +27,43 @@ pipeline {
       steps {
         script {
           if (isUnix()) {
+            // UNIX path: swallow failure, keep the stage green
             sh '''
               set -e
               echo "Attempting Gradle wrapper upgrade to 8.14.4 (Unix, workspace-only)..."
               ./gradlew --no-daemon wrapper --gradle-version 8.14.4 || {
-                echo "[WARN] Gradle wrapper upgrade failed; continuing (init scripts may still fail on Java 21 with old Gradle)."
+                echo "[WARN] Gradle wrapper upgrade failed; continuing (old Gradle may still fail on Java 21)."
               }
               echo "Wrapper version after upgrade attempt:"
               ./gradlew --version || true
             '''
           } else {
+            // WINDOWS path: avoid parentheses pitfalls; always exit 0
             bat '''
               @echo on
-              if exist gradlew.bat (
-                echo Attempting Gradle wrapper upgrade to 8.14.4 (Windows, workspace-only)...
-                call gradlew.bat --no-daemon wrapper --gradle-version 8.14.4
-                if errorlevel 1 (
-                  echo [WARN] Gradle wrapper upgrade failed; continuing (init scripts may still fail on Java 21 with old Gradle).
-                )
-                echo Wrapper version after upgrade attempt:
-                call gradlew.bat --version
+              setlocal
+
+              if not exist gradlew.bat goto no_gradle
+
+              echo Attempting Gradle wrapper upgrade to 8.14.4 (Windows, workspace-only)...
+              call gradlew.bat --no-daemon wrapper --gradle-version 8.14.4
+              if errorlevel 1 (
+                echo [WARN] Gradle wrapper upgrade failed; continuing (old Gradle may still fail on Java 21).
               ) else (
-                echo No Gradle wrapper found; skipping upgrade.
+                echo Wrapper upgrade succeeded.
               )
+
+              echo Wrapper version after upgrade attempt:
+              call gradlew.bat --version || echo [WARN] Could not query wrapper version
+
+              goto end
+
+              :no_gradle
+              echo No Gradle wrapper found; skipping upgrade.
+
+              :end
+              endlocal
+              exit /b 0
             '''
           }
         }
@@ -125,7 +139,7 @@ pipeline {
               echo JAVA_HOME=%JAVA_HOME%
               where java
               if exist gradlew.bat (
-                gradlew.bat --version
+                call gradlew.bat --version
               )
             '''
           }
@@ -139,7 +153,7 @@ pipeline {
       script {
         echo "NOTES:"
         echo " - Debricked CLI for Windows is shipped as .tar.gz; we extract debricked.exe with tar. (Official docs and releases confirm this format.)"
-        echo " - This pipeline upgrades the Gradle wrapper in the workspace to 8.14.4 before scanning so it can run on Java 21 and avoid 'major version 65'."
+        echo " - Gradle 8.5+ runs on Java 21; this job upgrades the wrapper in the workspace to 8.14.4 so Debricked's Gradle init won't fail with 'major version 65'."
         echo "   For a permanent fix, commit the wrapper bump in your repository."
       }
     }
