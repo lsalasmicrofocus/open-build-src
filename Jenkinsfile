@@ -1,7 +1,7 @@
 pipeline {
     agent any
     
-   environment {
+    environment {
         DEBRICKED_TOKEN = credentials('DEBRICKED_TOKEN')
     }
 
@@ -9,22 +9,22 @@ pipeline {
         stage('Debricked Scan') {
             steps {
                 script {
-                    // Inspiration taken from https://github.com/trustin/os-maven-plugin/blob/master/src/main/java/kr/motd/maven/os/Detector.java
-                    def osName = System.getProperty("os.name").toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "")
-                    if (osName.startsWith("linux")) { osName = "linux" }
-                    else if (osName.startsWith("mac") || osName.startsWith("osx")) { osName = "macOS" }
-                    else if (osName.startsWith("windows")) { osName = "windows" }
-                    else { osName = "linux" } // Default to linux
-
-                    def osArch = System.getProperty("os.arch").toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "")
-                    if (osArch.matches("(x8664|amd64|ia32e|em64t|x64)")) { osArch = "x86_64" }
-                    else if (osArch.matches("(x8632|x86|i[3-6]86|ia32|x32)")) { osArch = "i386" }
-                    else if (osArch.matches("(aarch_64)")) { osArch = "arm64" }
-                    else { osArch = "x86_64" } // Default to x86 64-bit
+                    // Since you're on Windows, we can simplify OS detection
+                    def osName = "windows"
+                    def osArch = "x86_64" // adjust if needed (e.g., arm64)
 
                     println("OS detected: " + osName + " and architecture " + osArch)
-                    sh 'curl -LsS https://github.com/debricked/cli/releases/download/release-v2/cli_' + osName + '_' + osArch + '.tar.gz | tar -xz debricked'
-                    sh './debricked scan'
+
+                    // Download Debricked CLI using PowerShell
+                    bat """
+                        powershell -Command ^
+                          Invoke-WebRequest -Uri https://github.com/debricked/cli/releases/download/release-v2/cli_${osName}_${osArch}.zip -OutFile debricked.zip
+                        powershell -Command ^
+                          Expand-Archive -Path debricked.zip -DestinationPath .
+                    """
+
+                    // Run the scan with the Windows executable
+                    bat 'debricked.exe scan'
                 }
             }
         }
