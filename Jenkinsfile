@@ -6,7 +6,7 @@ pipeline {
   }
 
   environment {
-    // Debricked access token stored as a Jenkins "Secret text" credential
+    // Debricked access token must exist as a "Secret text" credential in Jenkins
     DEBRICKED_TOKEN = credentials('DEBRICKED_TOKEN')
   }
 
@@ -27,7 +27,6 @@ pipeline {
       steps {
         script {
           if (isUnix()) {
-            // UNIX path: swallow failure, keep the stage green
             sh '''
               set -e
               echo "Attempting Gradle wrapper upgrade to 8.14.4 (Unix, workspace-only)..."
@@ -38,7 +37,7 @@ pipeline {
               ./gradlew --version || true
             '''
           } else {
-            // WINDOWS path: avoid parentheses pitfalls; always exit 0
+            // WINDOWS: NO parentheses; use labels and GOTO to avoid "unexpected at this time"
             bat '''
               @echo on
               setlocal
@@ -47,15 +46,15 @@ pipeline {
 
               echo Attempting Gradle wrapper upgrade to 8.14.4 (Windows, workspace-only)...
               call gradlew.bat --no-daemon wrapper --gradle-version 8.14.4
-              if errorlevel 1 (
-                echo [WARN] Gradle wrapper upgrade failed; continuing (old Gradle may still fail on Java 21).
-              ) else (
-                echo Wrapper upgrade succeeded.
-              )
+              if errorlevel 1 goto warn
+              echo Wrapper upgrade succeeded.
 
               echo Wrapper version after upgrade attempt:
-              call gradlew.bat --version || echo [WARN] Could not query wrapper version
+              call gradlew.bat --version
+              goto end
 
+              :warn
+              echo [WARN] Gradle wrapper upgrade failed; continuing (old Gradle may still fail on Java 21).
               goto end
 
               :no_gradle
